@@ -38,11 +38,13 @@ import org.videolan.vlc.R
 import org.videolan.vlc.RendererDelegate
 import org.videolan.vlc.gui.browser.MLStorageBrowserFragment
 import org.videolan.vlc.gui.dialogs.RenderersDialog
+import org.videolan.vlc.gui.helpers.SearchBackHandler
 import org.videolan.vlc.gui.helpers.UiTools
 import org.videolan.vlc.interfaces.Filterable
 
 open class ContentActivity : AudioPlayerContainerActivity(), SearchView.OnQueryTextListener, MenuItem.OnActionExpandListener {
 
+    private val searchBackHandler by lazy { SearchBackHandler(this) { closeSearchView() } }
     private lateinit var searchView: SearchView
     private lateinit var searchItem: MenuItem
     private var showRenderers = !AndroidDevices.isChromeBook && !RendererDelegate.renderers.value.isNullOrEmpty()
@@ -141,11 +143,16 @@ open class ContentActivity : AudioPlayerContainerActivity(), SearchView.OnQueryT
     }
 
     override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+        searchBackHandler.setEnabled(true)
         setSearchVisibility(true)
         return true
     }
 
     override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+        searchBackHandler.setEnabled(false)
+        searchView.setQuery("", false)
+        searchView.clearFocus()
+        UiTools.setKeyboardVisibility(searchView, false)
         setSearchVisibility(false)
         restoreCurrentList()
         return true
