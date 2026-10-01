@@ -1,0 +1,99 @@
+name: VLC Debug APK
+
+# Keep CI on the test branch. No workflow or code changes are needed on master.
+# Re-run an existing run from Actions; each future push starts a fresh build.
+on:
+  push:
+    branches: [fix/search-keep-results]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vlc-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out the test branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # Avoid a SIGPIPE from yes under pipefail after licenses are accepted.
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0' 'ndk;21.4.7075529'
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+
+      - name: Prepare the pinned LibVLC Gradle project
+        shell: bash
+        run: |
+          set -euo pipefail
+          # settings.gradle includes this project even for published Debug AARs.
+          git clone --single-branch --branch libvlcjni-3.x https://code.videolan.org/videolan/libvlcjni.git libvlcjni
+          git -C libvlcjni checkout --detach c0cc8ce6443dcb09be9b43c7b7a3ed01e33cb3ac
+
+      - name: Install the repository's Gradle version
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The repo does not check in gradlew. Match buildsystem/compile.sh.
+          curl --fail --location --retry 3 https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          echo "b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06  $RUNNER_TEMP/gradle.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-9.3.1/bin" >> "$GITHUB_PATH"
+
+      - name: Build the app-only Debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Debug uses published LibVLC 3.7.6 and Medialibrary 0.13.23.
+          # Dev/compile.sh would instead build native libraries, so do not use it.
+          gradle :application:app:assembleDebug --no-daemon --max-workers=2 --no-parallel --stacktrace --console=plain 2>&1 | tee build-debug.log
+
+      - name: Verify APK signatures and record build details
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apk-artifact
+          git rev-parse HEAD > apk-artifact/source-commit.txt
+          find application/app/build/outputs/apk -type f -name '*.apk' -print0 | while IFS= read -r -d '' apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk" | tee -a apk-artifact/apk-details.txt
+            "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" >> apk-artifact/apk-details.txt
+            cp "$apk" apk-artifact/
+          done
+          compgen -G 'apk-artifact/*.apk' >/dev/null
+          (cd apk-artifact && sha256sum *.apk > SHA256SUMS.txt)
+          echo 'Download the VLC-debug-apk artifact below, unzip it, and install the APK. This is a test build, not a Play Store release.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK and verification details
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: VLC-debug-apk-${{ github.sha }}
+          path: apk-artifact/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: VLC-debug-build-log-${{ github.sha }}
+          path: build-debug.log
+          if-no-files-found: ignore
+          retention-days: 14
