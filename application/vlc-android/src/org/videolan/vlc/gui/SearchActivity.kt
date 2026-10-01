@@ -21,6 +21,7 @@ import org.videolan.resources.util.getFromMl
 import org.videolan.tools.Settings
 import org.videolan.vlc.R
 import org.videolan.vlc.databinding.SearchActivityBinding
+import org.videolan.vlc.gui.helpers.SearchBackHandler
 import org.videolan.vlc.gui.helpers.UiTools
 import org.videolan.vlc.gui.helpers.applyTheme
 import org.videolan.vlc.gui.view.EmptyLoadingState
@@ -28,6 +29,13 @@ import org.videolan.vlc.media.MediaUtils
 
 open class SearchActivity : BaseActivity(), TextWatcher, TextView.OnEditorActionListener {
 
+    private val searchBackHandler by lazy {
+        SearchBackHandler(this) {
+            binding.searchEditText.clearFocus()
+            UiTools.setKeyboardVisibility(binding.searchEditText, false)
+            finish()
+        }
+    }
     private lateinit var medialibrary: Medialibrary
     private lateinit var binding: SearchActivityBinding
     private val clickHandler = ClickHandler()
@@ -38,6 +46,7 @@ open class SearchActivity : BaseActivity(), TextWatcher, TextView.OnEditorAction
         applyTheme()
         val intent = intent
         binding = DataBindingUtil.setContentView(this, R.layout.search_activity)
+        searchBackHandler.setEnabled(true)
         binding.handler = clickHandler
         binding.searchAggregate = SearchAggregate()
         medialibrary = Medialibrary.getInstance()
