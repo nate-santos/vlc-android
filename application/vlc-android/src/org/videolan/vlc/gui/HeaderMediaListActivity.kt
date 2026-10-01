@@ -96,6 +96,7 @@ import org.videolan.vlc.gui.helpers.AudioUtil.setRingtone
 import org.videolan.vlc.gui.helpers.DefaultPlaybackAction
 import org.videolan.vlc.gui.helpers.DefaultPlaybackActionMediaType
 import org.videolan.vlc.gui.helpers.ExpandStateAppBarLayoutBehavior
+import org.videolan.vlc.gui.helpers.SearchBackHandler
 import org.videolan.vlc.gui.helpers.SwipeDragItemTouchHelperCallback
 import org.videolan.vlc.gui.helpers.UiTools
 import org.videolan.vlc.gui.helpers.UiTools.addToPlaylist
@@ -140,6 +141,9 @@ import kotlin.math.min
 open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHandler<MediaLibraryItem>, IListEventsHandler, ActionMode.Callback, View.OnClickListener, CtxActionReceiver, Filterable, SearchView.OnQueryTextListener, MenuItem.OnActionExpandListener {
 
     private var lastDismissedPosition: Int = -1
+    private val searchBackHandler by lazy {
+        SearchBackHandler(this) { toolbar.menu.findItem(R.id.ml_menu_filter)?.collapseActionView() }
+    }
     private lateinit var searchView: SearchView
     private lateinit var itemTouchHelperCallback: SwipeDragItemTouchHelperCallback
     private lateinit var audioBrowserAdapter: AudioBrowserAdapter
@@ -703,6 +707,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     }
 
     override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+        searchBackHandler.setEnabled(true)
         binding.appbar.setExpanded(false, true)
         audioBrowserAdapter.stopReorder = true
         audioBrowserAdapter.notifyItemRangeChanged(0, audioBrowserAdapter.itemCount, UPDATE_REORDER)
@@ -711,6 +716,11 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     }
 
     override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+        searchBackHandler.setEnabled(false)
+        searchView.setQuery("", false)
+        searchView.clearFocus()
+        UiTools.setKeyboardVisibility(searchView, false)
+        restoreList()
         audioBrowserAdapter.stopReorder = false
         audioBrowserAdapter.notifyItemRangeChanged(0, audioBrowserAdapter.itemCount, UPDATE_REORDER)
         ((binding.appbar.layoutParams as CoordinatorLayout.LayoutParams).behavior as ExpandStateAppBarLayoutBehavior).scrollEnabled = true
