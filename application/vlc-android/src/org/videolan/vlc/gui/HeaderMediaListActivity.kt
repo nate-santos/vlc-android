@@ -97,6 +97,7 @@ import org.videolan.vlc.gui.helpers.DefaultPlaybackAction
 import org.videolan.vlc.gui.helpers.DefaultPlaybackActionMediaType
 import org.videolan.vlc.gui.helpers.ExpandStateAppBarLayoutBehavior
 import org.videolan.vlc.gui.helpers.SwipeDragItemTouchHelperCallback
+import org.videolan.vlc.gui.helpers.SearchKeyboardBackHandler
 import org.videolan.vlc.gui.helpers.UiTools
 import org.videolan.vlc.gui.helpers.UiTools.addToPlaylist
 import org.videolan.vlc.gui.helpers.UiTools.createShortcut
@@ -140,6 +141,9 @@ import kotlin.math.min
 open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHandler<MediaLibraryItem>, IListEventsHandler, ActionMode.Callback, View.OnClickListener, CtxActionReceiver, Filterable, SearchView.OnQueryTextListener, MenuItem.OnActionExpandListener {
 
     private var lastDismissedPosition: Int = -1
+    private val searchKeyboardBackHandler by lazy {
+        SearchKeyboardBackHandler(this) { searchView }
+    }
     private lateinit var searchView: SearchView
     private lateinit var itemTouchHelperCallback: SwipeDragItemTouchHelperCallback
     private lateinit var audioBrowserAdapter: AudioBrowserAdapter
@@ -703,6 +707,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     }
 
     override fun onMenuItemActionExpand(item: MenuItem): Boolean {
+        searchKeyboardBackHandler.setSearchActive(true)
         binding.appbar.setExpanded(false, true)
         audioBrowserAdapter.stopReorder = true
         audioBrowserAdapter.notifyItemRangeChanged(0, audioBrowserAdapter.itemCount, UPDATE_REORDER)
@@ -711,6 +716,7 @@ open class HeaderMediaListActivity : AudioPlayerContainerActivity(), IEventsHand
     }
 
     override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+        searchKeyboardBackHandler.setSearchActive(false)
         audioBrowserAdapter.stopReorder = false
         audioBrowserAdapter.notifyItemRangeChanged(0, audioBrowserAdapter.itemCount, UPDATE_REORDER)
         ((binding.appbar.layoutParams as CoordinatorLayout.LayoutParams).behavior as ExpandStateAppBarLayoutBehavior).scrollEnabled = true
